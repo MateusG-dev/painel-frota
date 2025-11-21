@@ -11,8 +11,6 @@
     .logo { text-align: center; padding: 10px 0; }
     .logo img { height: 70px; }
     h1 { text-align: center; margin: 0; padding-bottom: 10px; font-size: 26px; font-weight: bold; }
-    .filtros { text-align: center; margin: 10px 0; }
-    .filtros select { font-size: 14px; padding: 5px; margin: 0 5px; }
 
     .tabela-container { padding: 10px; overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; min-width: 900px; }
@@ -34,17 +32,6 @@
 
 <h1>PAINEL DE STATUS DA FROTA</h1>
 
-<div class="filtros">
-    Data: <select id="selectData"></select>
-    Horário: <select id="selectHorario">
-        <option value="08-00">08:00</option>
-        <option value="12-00">12:00</option>
-        <option value="15-00">15:00</option>
-        <option value="18-00">18:00</option>
-    </select>
-    <button onclick="carregarCSV()">Atualizar</button>
-</div>
-
 <div class="tabela-container">
   <table id="tabela">
     <thead>
@@ -53,78 +40,39 @@
         <th>Destino</th><th>Status</th><th>Km rodado</th><th>Cliente</th><th>Observação</th>
       </tr>
     </thead>
-    <tbody id="dados"></tbody>
+    <tbody id="dados">
+      <tr><td colspan="9">Carregando dados...</td></tr>
+    </tbody>
   </table>
 </div>
 
 <script>
-// Lista de CSVs será carregada do index.json
-let arquivosCSV = [];
-
-async function carregarListaCSV() {
+// Função para carregar o último CSV
+async function carregarUltimoCSV() {
     try {
-        const resp = await fetch("historico/index.json?v=" + new Date().getTime());
-        if (!resp.ok) throw new Error("Não foi possível carregar a lista de CSVs");
-        arquivosCSV = await resp.json();
+        // Lê o arquivo JSON que contém o nome do último CSV
+        const respJson = await fetch("historico/ultimo.json?v=" + new Date().getTime());
+        if (!respJson.ok) throw new Error("Não foi possível carregar o último CSV");
+        const data = await respJson.json();
 
-        const selectData = document.getElementById("selectData");
-        selectData.innerHTML = ""; // limpa opções
-
-        const datas = [...new Set(arquivosCSV.map(f => f.split("_")[0]))];
-        datas.sort((a,b) => a.localeCompare(b));
-        datas.forEach(d => {
-            const option = document.createElement("option");
-            option.value = d;
-            option.textContent = d;
-            selectData.appendChild(option);
-        });
-
-        // Seleciona automaticamente a última data disponível
-        selectData.value = datas[datas.length - 1];
-
-        // Seleciona automaticamente o último horário disponível para a data
-        const ultimaData = selectData.value;
-        const horariosDisponiveis = arquivosCSV
-            .filter(f => f.startsWith(ultimaData))
-            .map(f => f.split("_")[1].replace(".csv",""));
-        const selectHorario = document.getElementById("selectHorario");
-        if(horariosDisponiveis.length > 0) {
-            selectHorario.value = horariosDisponiveis[horariosDisponiveis.length - 1];
-        }
-
-        carregarCSV();
-    } catch(e) {
-        console.error(e);
-        document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Erro ao carregar a lista de arquivos.</td></tr>";
-    }
-}
-
-function getCSVFile() {
-    const data = document.getElementById("selectData").value;
-    const horario = document.getElementById("selectHorario").value;
-    const arquivo = arquivosCSV.find(f => f.startsWith(data) && f.includes(horario));
-    return arquivo ? "historico/" + arquivo : null;
-}
-
-async function carregarCSV() {
-    const arquivo = getCSVFile();
-    if (!arquivo) {
-        document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Status ainda não disponível para esta data/horário.</td></tr>";
-        return;
-    }
-
-    try {
-        const resp = await fetch(arquivo + "?v=" + new Date().getTime());
-        if (!resp.ok) {
-            document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Status ainda não disponível para esta data/horário.</td></tr>";
+        const arquivo = data.ultimo ? "historico/" + data.ultimo + "?v=" + new Date().getTime() : null;
+        if (!arquivo) {
+            document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Nenhum CSV disponível.</td></tr>";
             return;
         }
 
-        const texto = await resp.text();
+        // Lê o CSV
+        const respCSV = await fetch(arquivo);
+        if (!respCSV.ok) {
+            document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Status ainda não disponível.</td></tr>";
+            return;
+        }
+
+        const texto = await respCSV.text();
         const linhas = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
 
         let html = "";
-        for (let i = 2; i < linhas.length; i++) {
+        for (let i = 2; i < linhas.length; i++) {  // pular cabeçalho
             const c = linhas[i].split(";");
             html += `<tr>
                 <td>${c[0]}</td>
@@ -139,14 +87,15 @@ async function carregarCSV() {
             </tr>`;
         }
         document.getElementById("dados").innerHTML = html;
+
     } catch (e) {
-        console.error("Erro ao carregar CSV:", e);
-        document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Status ainda não disponível para esta data/horário.</td></tr>";
+        console.error(e);
+        document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Erro ao carregar o CSV.</td></tr>";
     }
 }
 
-// Inicializa tudo
-carregarListaCSV();
+// Inicializa
+carregarUltimoCSV();
 </script>
 
 </body>
