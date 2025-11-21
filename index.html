@@ -63,12 +63,13 @@ let arquivosCSV = [];
 
 async function carregarListaCSV() {
     try {
-        const resp = await fetch("historico/index.json");
+        const resp = await fetch("historico/index.json?v=" + new Date().getTime());
         if (!resp.ok) throw new Error("Não foi possível carregar a lista de CSVs");
         arquivosCSV = await resp.json();
 
-        // Preencher dropdown de datas automaticamente
         const selectData = document.getElementById("selectData");
+        selectData.innerHTML = ""; // limpa opções
+
         const datas = [...new Set(arquivosCSV.map(f => f.split("_")[0]))];
         datas.sort((a,b) => a.localeCompare(b));
         datas.forEach(d => {
@@ -78,7 +79,19 @@ async function carregarListaCSV() {
             selectData.appendChild(option);
         });
 
-        // Carregar CSV inicial
+        // Seleciona automaticamente a última data disponível
+        selectData.value = datas[datas.length - 1];
+
+        // Seleciona automaticamente o último horário disponível para a data
+        const ultimaData = selectData.value;
+        const horariosDisponiveis = arquivosCSV
+            .filter(f => f.startsWith(ultimaData))
+            .map(f => f.split("_")[1].replace(".csv",""));
+        const selectHorario = document.getElementById("selectHorario");
+        if(horariosDisponiveis.length > 0) {
+            selectHorario.value = horariosDisponiveis[horariosDisponiveis.length - 1];
+        }
+
         carregarCSV();
     } catch(e) {
         console.error(e);
@@ -101,7 +114,7 @@ async function carregarCSV() {
     }
 
     try {
-        const resp = await fetch(arquivo);
+        const resp = await fetch(arquivo + "?v=" + new Date().getTime());
         if (!resp.ok) {
             document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Status ainda não disponível para esta data/horário.</td></tr>";
             return;
