@@ -56,7 +56,7 @@
 
 <script>
 async function carregarDados() {
-    const url = "frota.csv"; // CSV enviado para o GitHub
+    const url = "https://raw.githubusercontent.com/mateusg-dev/painel-frota/main/frota.csv"; // CSV do GitHub
     try {
         const resposta = await fetch(url);
         const texto = await resposta.text();
