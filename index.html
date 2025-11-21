@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <title>Painel de Status da Frota</title>
-
 <style>
     body { font-family: Arial, sans-serif; margin: 0; background: #009b00; color: #fff; }
     .logo { text-align: center; padding: 10px 0; }
@@ -18,8 +16,11 @@
     th { background: #0000aa; color: #fff; font-size: 15px; }
     td { background: #00a000; font-size: 14px; }
 
+    select { margin: 10px; padding: 5px; font-size: 14px; }
+
     @media (max-width: 699px) {
         th, td { font-size: 12px; padding: 5px; }
+        select { font-size: 12px; }
     }
 </style>
 </head>
@@ -31,6 +32,11 @@
 </div>
 
 <h1>PAINEL DE STATUS DA FROTA</h1>
+
+<div style="text-align:center;">
+    <label for="historicoSelect">Escolha um horário: </label>
+    <select id="historicoSelect"></select>
+</div>
 
 <div class="tabela-container">
   <table id="tabela">
@@ -47,32 +53,18 @@
 </div>
 
 <script>
-// Função para carregar o último CSV
-async function carregarUltimoCSV() {
+async function carregarCSV(nomeArquivo) {
     try {
-        // Lê o arquivo JSON que contém o nome do último CSV
-        const respJson = await fetch("historico/ultimo.json?v=" + new Date().getTime());
-        if (!respJson.ok) throw new Error("Não foi possível carregar o último CSV");
-        const data = await respJson.json();
-
-        const arquivo = data.ultimo ? "historico/" + data.ultimo + "?v=" + new Date().getTime() : null;
-        if (!arquivo) {
-            document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Nenhum CSV disponível.</td></tr>";
-            return;
-        }
-
-        // Lê o CSV
+        const arquivo = "https://raw.githubusercontent.com/mateusg-dev/painel-frota/main/historico/" + nomeArquivo + "?v=" + new Date().getTime();
         const respCSV = await fetch(arquivo);
         if (!respCSV.ok) {
             document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Status ainda não disponível.</td></tr>";
             return;
         }
-
         const texto = await respCSV.text();
         const linhas = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-
         let html = "";
-        for (let i = 2; i < linhas.length; i++) {  // pular cabeçalho
+        for (let i = 2; i < linhas.length; i++) { // pular título e cabeçalho
             const c = linhas[i].split(";");
             html += `<tr>
                 <td>${c[0]}</td>
@@ -87,15 +79,48 @@ async function carregarUltimoCSV() {
             </tr>`;
         }
         document.getElementById("dados").innerHTML = html;
-
     } catch (e) {
         console.error(e);
         document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Erro ao carregar o CSV.</td></tr>";
     }
 }
 
+async function inicializar() {
+    try {
+        // Carrega ultimo.csv
+        const respUltimo = await fetch("https://raw.githubusercontent.com/mateusg-dev/painel-frota/main/historico/ultimo.json?v=" + new Date().getTime());
+        const dataUltimo = await respUltimo.json();
+        const ultimoCSV = dataUltimo.ultimo;
+
+        // Carrega lista de todos CSVs
+        const respHistorico = await fetch("https://raw.githubusercontent.com/mateusg-dev/painel-frota/main/historico/historico.json?v=" + new Date().getTime());
+        const dataHistorico = await respHistorico.json();
+        const select = document.getElementById("historicoSelect");
+
+        dataHistorico.arquivos.forEach(arq => {
+            const option = document.createElement("option");
+            option.value = arq;
+            option.text = arq.replace(".csv","").replace("_"," ");
+            if(arq === ultimoCSV) option.selected = true;
+            select.appendChild(option);
+        });
+
+        // Carrega automaticamente o último CSV
+        carregarCSV(ultimoCSV);
+
+        // Evento para selecionar outro CSV
+        select.addEventListener("change", (e) => {
+            carregarCSV(e.target.value);
+        });
+
+    } catch(e) {
+        console.error(e);
+        document.getElementById("dados").innerHTML = "<tr><td colspan='9'>Erro ao inicializar o painel.</td></tr>";
+    }
+}
+
 // Inicializa
-carregarUltimoCSV();
+inicializar();
 </script>
 
 </body>
